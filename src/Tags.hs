@@ -22,7 +22,11 @@ module Tags
 import Data.Vector(Vector, (!))
 import Language.Haskell.Exts.Annotated (SrcSpan(..), SrcSpanInfo(..))
 import Language.Haskell.Exts.Annotated.Syntax
-import Language.Haskell.Exts.Pretty (prettyPrintStyleMode, Style(..), Mode(OneLineMode), defaultMode)
+import Language.Haskell.Exts.Pretty ( prettyPrintStyleMode
+                                    , Style(..)
+                                    , Mode(OneLineMode)
+                                    , defaultMode
+                                    )
 
 data Tag = Tag
     { tagName :: String
@@ -123,8 +127,16 @@ applyAccessModifiers exportTags declTags = map applySingle declTags
                 then tag { tagAccess = Just AccessPublic }
                 else tag
 
-createTag :: String -> TagKind -> Maybe (TagKind, String) -> Maybe String -> Maybe TagAccess -> SrcSpanInfo -> TagC
-createTag name kind parent signature access (SrcSpanInfo (SrcSpan file line _ _ _) _) fileLines = Tag
+createTag :: String
+          -> TagKind
+          -> Maybe (TagKind, String)
+          -> Maybe String
+          -> Maybe TagAccess
+          -> SrcSpanInfo
+          -> TagC
+createTag
+  name kind parent signature access
+  (SrcSpanInfo (SrcSpan file line _ _ _) _) fileLines = Tag
     { tagName = name
     , tagFile = file
     -- TODO This probably needs to be escaped:

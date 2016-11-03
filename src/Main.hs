@@ -15,15 +15,27 @@
 module Main (main) where
 
 import Data.List (isPrefixOf, partition)
-import Data.Vector(Vector, fromList)
-import Language.Haskell.Exts.Annotated (parseFileContentsWithMode, ParseMode(..), knownExtensions, ParseResult(ParseOk, ParseFailed))
+import Data.Vector (Vector, fromList)
+import Data.Char (toLower)
+import Language.Haskell.Exts.Annotated ( parseFileContentsWithMode
+                                       , ParseMode(..)
+                                       , knownExtensions
+                                       , ParseResult(ParseOk, ParseFailed)
+                                       )
 import Language.Haskell.Exts.Extension (Language(..))
 import System.Environment (getArgs, getProgName)
 import System.IO (hPutStrLn, stderr)
+import System.Exit (ExitCode(ExitSuccess))
 import qualified Data.Text as T (unpack, lines, pack, unlines)
 import qualified Data.Text.IO as T (readFile, putStr)
+import qualified System.Process as Proc
+import Control.Monad (when)
 
 import Tags (Tag, createTags, tagToString)
+
+(&) :: a -> (a -> b) -> b
+(&) = flip ($)
+infixl 0 &
 
 main :: IO ()
 main = do
@@ -64,12 +76,48 @@ processFile file ignore_parse_error = do
 
 loadFile :: FilePath -> IO (String, Vector String)
 loadFile file = do
-    text <- T.readFile file
+    let isHsc = file & reverse & take 4 & reverse & map toLower & (== ".hsc")
+    realFile <- if isHsc then getCompiledHscPath else return file
+    text <- T.readFile realFile
+    when isHsc $ cleanTmpFile realFile
     let fullContents = T.unpack text
     let textLines = T.lines text
     let stringLines = map T.unpack textLines
     let fileLines = fromList stringLines
     return (fullContents, fileLines)
+    where
+        getCompiledHscPath :: IO String
+        getCompiledHscPath = do
+            tmpFile <- getTmpFile
+            compileHs tmpFile
+            return tmpFile
+
+        getTmpFile :: IO String
+        getTmpFile = do
+            (exitCode, out, err) <-
+                Proc.readProcessWithExitCode "mktemp" [] ""
+            case exitCode of
+                ExitSuccess -> return $ takeWhile (/= '\n') out
+                _ -> putStr err
+                  >> error "Getting temporary file by 'mktemp' was failed"
+
+        compileHs :: String -> IO ()
+        compileHs tmpFile = do
+            (exitCode, _, err) <-
+                Proc.readProcessWithExitCode "hsc2hs" [file, "-o", tmpFile] ""
+            when (exitCode /= ExitSuccess) $ do
+                putStr err
+                error "Compilation using 'hsc2hs' was failed"
+            return ()
+
+        cleanTmpFile :: String -> IO ()
+        cleanTmpFile tmpFile = do
+            (exitCode, _, err) <-
+                Proc.readProcessWithExitCode "rm" [tmpFile] ""
+            when (exitCode /= ExitSuccess) $ do
+                putStr err
+                error "Cleaning temporary file using 'rm' was failed"
+            return ()
 
 getOptions :: [String] -> ([String], [String])
 getOptions args =
