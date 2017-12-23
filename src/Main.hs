@@ -17,12 +17,11 @@ module Main (main) where
 import Data.List (isPrefixOf, partition)
 import Data.Vector (Vector, fromList)
 import Data.Char (toLower)
-import Language.Haskell.Exts.Annotated ( parseFileContentsWithMode
-                                       , ParseMode(..)
-                                       , knownExtensions
-                                       , ParseResult(ParseOk, ParseFailed)
-                                       )
-import Language.Haskell.Exts.Extension (Language(..))
+import Language.Haskell.Exts (parseFileContentsWithMode)
+import Language.Haskell.Exts.Parser ( ParseMode(..)
+                                    , ParseResult(ParseOk, ParseFailed)
+                                    )
+import Language.Haskell.Exts.Extension (Language(..), knownExtensions)
 import System.Environment (getArgs, getProgName)
 import System.IO (hPutStrLn, stderr)
 import System.Exit (ExitCode(ExitSuccess))
