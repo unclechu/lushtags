@@ -14,17 +14,17 @@
 
 module Tags
     (
-      Tag(..)
+      Tag (..)
     , createTags
     , tagToString
     ) where
 
-import Data.Vector(Vector, (!))
-import Language.Haskell.Exts.SrcLoc (SrcSpan(..), SrcSpanInfo(..))
+import Data.Vector (Vector, (!))
+import Language.Haskell.Exts.SrcLoc (SrcSpan (..), SrcSpanInfo (..))
 import Language.Haskell.Exts.Syntax
 import Language.Haskell.Exts.Pretty ( prettyPrintStyleMode
-                                    , Style(..)
-                                    , Mode(OneLineMode)
+                                    , Style (..)
+                                    , Mode (OneLineMode)
                                     , defaultMode
                                     )
 
