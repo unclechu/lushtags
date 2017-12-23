@@ -12,51 +12,80 @@
 --
 -----------------------------------------------------------------------------
 
+{-# LANGUAGE LambdaCase #-}
+
 module Main (main) where
 
-import Data.List (isPrefixOf, partition)
+import Data.List (isPrefixOf, partition, intercalate)
 import Data.Vector (Vector, fromList)
 import Data.Char (toLower)
+import Data.Function ((&))
 import Language.Haskell.Exts (parseFileContentsWithMode)
-import Language.Haskell.Exts.Parser ( ParseMode(..)
-                                    , ParseResult(ParseOk, ParseFailed)
+import Language.Haskell.Exts.Parser ( ParseMode (..)
+                                    , ParseResult (ParseOk, ParseFailed)
                                     )
-import Language.Haskell.Exts.Extension (Language(..), knownExtensions)
+import Language.Haskell.Exts.Extension ( Language (..)
+                                       , Extension (UnknownExtension)
+                                       , classifyExtension
+                                       )
 import System.Environment (getArgs, getProgName)
 import System.IO (hPutStrLn, stderr)
 import System.Exit (ExitCode(ExitSuccess))
 import qualified Data.Text as T (unpack, lines, pack, unlines)
 import qualified Data.Text.IO as T (readFile, putStr)
 import qualified System.Process as Proc
-import Control.Monad (when)
+import Control.Monad (when, unless)
 
 import Tags (Tag, createTags, tagToString)
 
-(&) :: a -> (a -> b) -> b
-(&) = flip ($)
-infixl 0 &
+
+data ParseOptions
+    = ParseOptions
+    { ignoreParseError     :: Bool
+    , predefinedExtensions :: [Extension]
+    } deriving (Show, Eq)
+
 
 main :: IO ()
 main = do
     rawArgs <- getArgs
+
     let (options, files) = getOptions rawArgs
-        ignore_parse_error = "--ignore-parse-error" `elem` options
+
+        parseOpts
+          = ParseOptions
+          { ignoreParseError = "--ignore-parse-error" `elem` options
+
+          , predefinedExtensions = [ classifyExtension (drop 2 opt)
+                                   | opt <- options
+                                   , take 2 opt == "-X"
+                                   ]
+          }
+
     case files of
         [] -> do
             progName <- getProgName
             hPutStrLn stderr $ "Usage: " ++ progName ++ " [options] [--] <file>"
-        filename:_ -> processFile filename ignore_parse_error >>= printTags
+        filename:_ -> do
+            let unknownExts =
+                    foldr (\case UnknownExtension x -> (x :) ; _ -> id) []
+                        $ predefinedExtensions parseOpts
+
+            unless (null unknownExts) $
+                error $ "Unknown extensions: " ++ intercalate ", " unknownExts
+
+            processFile filename parseOpts >>= printTags
 
 printTags :: [Tag] -> IO ()
 printTags tags =
     T.putStr $ T.unlines $ map (T.pack . tagToString) tags
 
-processFile :: FilePath -> Bool -> IO [Tag]
-processFile file ignore_parse_error = do
+processFile :: FilePath -> ParseOptions -> IO [Tag]
+processFile file opts = do
     (fileContents, fileLines) <- loadFile file
     case parseFileContentsWithMode parseMode fileContents of
         ParseFailed loc message ->
-            if ignore_parse_error then
+            if ignoreParseError opts then
                 return []
             else
                 -- TODO Better error reporting
@@ -66,7 +95,7 @@ processFile file ignore_parse_error = do
         parseMode = ParseMode
             { parseFilename = file
             , baseLanguage = Haskell2010
-            , extensions = knownExtensions
+            , extensions = predefinedExtensions opts
             , ignoreLanguagePragmas = False
             , ignoreLinePragmas = True
             , fixities = Nothing
